@@ -89,7 +89,7 @@ class Database:
     def get_groups(self):
         
         sql = """
-        SELECT * FROM groups_tb"""
+        SELECT group_id FROM groups_tb"""
 
         return self.execute(sql=sql, fetchall=True)
 
@@ -101,6 +101,15 @@ class Database:
         ON CONFLICT (user_id) DO NOTHING  -- Avoid duplicates
         """
         params = (full_name, user_id)
+        self.execute(sql=sql, params=params, commit=True)
+
+    def delete_group(self, group_id):
+
+        sql = """
+        DELETE FROM groups_tb WHERE group_id = %s
+        """
+
+        params = (group_id,)
         self.execute(sql=sql, params=params, commit=True)
 
 
@@ -134,7 +143,7 @@ class Database:
 
 
 db = Database(
-    db_name="adbot",
+    db_name="mahallanewsbot",
     db_user="postgres",
     db_password="0000",
     db_host="localhost",

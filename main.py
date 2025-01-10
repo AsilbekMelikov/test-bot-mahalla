@@ -1,8 +1,8 @@
 import asyncio
 
-
+from aiogram.types import ChatMemberUpdated
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message, CallbackQuery, BotCommand
+from aiogram.types import Message
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -13,7 +13,6 @@ from environs import Env
 
 
 from keyboards.reply_keyboards import admin_keyboard,register_confirm_keyboard,send_confirm_keyboard
-from keyboards.inline_keyboards import add_to_group
 
 # Load environment variables
 env = Env()
@@ -21,8 +20,9 @@ env.read_env()
 
 
 # BOT TOKEN and other settings
-BOT_TOKEN = env('BOT_TOKEN')
-SUPER_ADMIN = 1130649180
+BOT_TOKEN = env('TOKEN')
+SUPER_ADMIN = 1002999262
+# SUPER_ADMIN = 1104276600
 
 
 # Initialize Bot and Dispatcher
@@ -75,50 +75,13 @@ async def start_command(message: Message):
             reply_markup=admin_keyboard(is_admin=False),
             parse_mode="Markdown"  
         )
-    else:
-        await message.answer(text="Botni guruhga qo'shib uni tasdiqlang.", reply_markup=add_to_group())
     
-
-@dp.message(Command("add_group"))
-async def add_group(message: Message):
-    await message.answer(text="Botni guruhga qo'shib uni tasdiqlang.", reply_markup=add_to_group())
-
-@dp.callback_query(lambda query: query.data == "check_admin")
-async def check_group(query: CallbackQuery):
-    await query.message.answer(text="Admin qilgan guruhingizdan istalgan habarni menga yuboring!")
-
-    # Foydalanuvchidan xabarni kutish
-    @dp.message(lambda message: message.forward_from_chat.id)
-    async def handle_message(message: Message):
-        # Agar xabar guruh yoki kanalga yuborilgan bo'lsa
-        if message.forward_from_chat:
-            chat_id = message.forward_from_chat.id
-
-            # Kanal yoki guruhda adminligini tekshirish
-            try:
-                bot_member = await bot.get_chat_member(chat_id, bot.id)
-
-                # Bot adminligini tekshirish
-                if bot_member.status in ['administrator', 'creator']:
-                    await bot.send_message(chat_id=message.from_user.id, text="Bot admin qilindi, raxmat!")
-                    db.register_groups(group_name=message.forward_from_chat.full_name, group_id=message.forward_from_chat.id)
-                else:
-                    await bot.send_message(chat_id=message.from_user.id, text="Bot admin qilinmagan.")
-            except Exception as e:
-                await bot.send_message(chat_id=message.from_user.id, text=f"Bot guruhda admin emas yoki xato yuz berdi. {str(e)}")
-        
-        else:
-            await bot.send_message(chat_id=message.from_user.id, text="Iltimos, kanal yoki guruhdan forward qilingan xabar yuboring.")
-
 
 
 @dp.message(lambda message: message.text is not None and "👤 Admin qo'shish" in message.text)
 async def add_admin(message: Message, state: FSMContext):
     user_id = message.from_user.id
-    # if user_id != 1130649180:
-    #     await message.reply("Sizda admin qo'shish huquqi yo'q. ❌")
-    #     return
-
+   
     await message.reply(f"""
     ✨ Ro'yxatdan o'tish uchun adminning ism va familyasini quyidagi tartibda kiriting: 
 
@@ -140,6 +103,8 @@ async def handle_full_name(message: Message, state: FSMContext):
     await message.reply("Iltimos, Yangi admin ID raqamini kiriting:")
     await state.set_state(Registration.waiting_for_user_id.state)
     
+
+
 
 # Handle user ID input
 @dp.message(Registration.waiting_for_user_id)
@@ -229,90 +194,6 @@ async def handle_post_content(message: Message, state: FSMContext):
 
 
 
-# Step 3: Confirm and send the post
-@dp.message(PostState.waiting_for_confirmation, F.text == "✅ Tasdiqlash Post")
-async def confirm_and_send_post(message: Message, state: FSMContext):
-    # Retrieve the stored message
-    data = await state.get_data()
-    post_content = data.get("post_content")
-    admin = message.from_user.id
-    get_admin = db.get_admin(user_id=admin)
-
-    if not post_content:
-
-        if get_admin:
-            await message.reply("Xato: Post ma'lumotlari topilmadi.", reply_markup=admin_keyboard(is_admin=True))
-        else:
-            await message.reply("Xato: Post ma'lumotlari topilmadi.", reply_markup=admin_keyboard(is_admin=False))
-
-        return
-
-    groups = db.get_groups()
-    # Send the message to all groups
-    total_groups = len(groups)
-    success_count = 0
-    failed_count = 0
-    blocked_count = 0  # Yuborishda bloklangan guruhlar
-    deactivated_count = 0  # O'chirilgan guruhlar
-    not_found_count = 0  # Topilmagan guruhlar
-    failed_groups = [] 
-
-    # Har bir guruhga xabar yuborish
-    for group in groups:
-        group_id = group[2]
-        group_name = group[1] 
-        try:
-            # Postni guruhga yuborish
-            await bot.forward_message(
-                chat_id=group_id,
-                from_chat_id=post_content.chat.id,
-                message_id=post_content.message_id
-            )
-            success_count += 1  # Yuborilgan guruhlar sonini oshirish
-        except Exception as e:
-            failed_groups.append(group_name) 
-
-            # Xato turini aniqlash
-            if "blocked" in str(e).lower():
-                blocked_count += 1
-            elif "deactivated" in str(e).lower():
-                deactivated_count += 1
-            elif "not found" in str(e).lower():
-                not_found_count += 1
-            else:
-                failed_count += 1  # Boshqa xatolar
-
-    # Statistika
-    progress = (success_count / total_groups) * 100 if total_groups > 0 else 0
-
-
-    if get_admin:
-        await message.reply(
-        f"Progress: {progress:.2f}% ({success_count + failed_count}/{total_groups} chats)\n"
-        f"Success: {success_count}\n"
-        f"Blocked: {blocked_count}\n"
-        f"Deactivated: {deactivated_count}\n"
-        f"Not Found: {not_found_count}\n"
-        f"Failed: {failed_count}",
-        reply_markup=admin_keyboard(is_admin=True)
-    )
-    else:
-        await message.reply(
-        f"Progress: {progress:.2f}% ({success_count + failed_count}/{total_groups} chats)\n"
-        f"Success: {success_count}\n"
-        f"Blocked: {blocked_count}\n"
-        f"Deactivated: {deactivated_count}\n"
-        f"Not Found: {not_found_count}\n"
-        f"Failed: {failed_count}",
-        reply_markup=admin_keyboard(is_admin=False)
-    )
-        
-    if failed_groups:
-        result_message = "Yuborilmagan guruhlar:\n"
-        for index, group_name in enumerate(failed_groups, start=1):
-            result_message += f"{index}. {group_name}\n"
-        await message.answer(text=result_message)
-
 
 
 @dp.message(F.text == "❌ Bekor qilish Post")
@@ -384,6 +265,110 @@ async def handle_delete_admin_user_id(message: Message, state: FSMContext):
 
     # Clear the state
     await state.clear()
+
+
+
+# List to store chat IDs of groups the bot has joined
+joined_groups = db.get_groups()
+joined_groups = {group[0] for group in joined_groups}
+
+@dp.my_chat_member()
+async def track_joined_groups(event: ChatMemberUpdated):
+    """Track groups the bot joins or leaves."""
+    chat = event.chat
+
+    if event.new_chat_member.status in ["member", "administrator"]:
+        # Bot added to a group
+        db.register_groups(group_name=chat.title, group_id=chat.id)
+    elif event.new_chat_member.status == "left":
+        # Bot removed from a group
+        db.delete_group(group_id=chat.id)
+
+
+@dp.message(PostState.waiting_for_confirmation, F.text == "✅ Tasdiqlash Post")
+async def confirm_and_send_post(message: Message, state: FSMContext):
+    # Retrieve the stored message
+    data = await state.get_data()
+    post_content = data.get("post_content")
+    admin = message.from_user.id
+    get_admin = db.get_admin(user_id=admin)
+
+    if not post_content:
+
+        if get_admin:
+            await message.reply("Xato: Post ma'lumotlari topilmadi.", reply_markup=admin_keyboard(is_admin=True))
+        else:
+            await message.reply("Xato: Post ma'lumotlari topilmadi.", reply_markup=admin_keyboard(is_admin=False))
+
+        return
+
+    groups = db.get_groups()
+    
+    # Send the message to all groups
+    total_groups = len(groups)
+    success_count = 0
+    failed_count = 0
+    blocked_count = 0  # Yuborishda bloklangan guruhlar
+    deactivated_count = 0  # O'chirilgan guruhlar
+    not_found_count = 0  # Topilmagan guruhlar
+    failed_groups = [] 
+
+    # Har bir guruhga xabar yuborish
+    # Har bir guruhga xabar yuborish
+    for index, group in enumerate(groups):
+        group_id = group[0]
+        try:
+            # Postni guruhga yuborish
+            await bot.forward_message(
+                chat_id=group_id,
+                from_chat_id=post_content.chat.id,
+                message_id=post_content.message_id
+            )
+            success_count += 1  # Yuborilgan guruhlar sonini oshirish
+        except Exception as e:
+            # Xato turini aniqlash
+            if "blocked" in str(e).lower():
+                blocked_count += 1
+            elif "deactivated" in str(e).lower():
+                deactivated_count += 1
+            elif "not found" in str(e).lower():
+                not_found_count += 1
+            else:
+                failed_count += 1  # Boshqa xatolar
+
+        # Add a small delay to prevent rate-limiting
+        if (index + 1) % 30 == 0:  # After every 30 messages
+            await asyncio.sleep(2)  # 1 second delay
+
+    # Statistika
+    progress = (success_count / total_groups) * 100 if total_groups > 0 else 0
+
+    if get_admin:
+        await message.reply(
+            f"Progress: {progress:.2f}% ({success_count + failed_count}/{total_groups} chats)\n"
+            f"Success: {success_count}\n"
+            f"Blocked: {blocked_count}\n"
+            f"Deactivated: {deactivated_count}\n"
+            f"Not Found: {not_found_count}\n"
+            f"Failed: {failed_count}",
+            reply_markup=admin_keyboard(is_admin=True)
+        )
+    else:
+        await message.reply(
+            f"Progress: {progress:.2f}% ({success_count + failed_count}/{total_groups} chats)\n"
+            f"Success: {success_count}\n"
+            f"Blocked: {blocked_count}\n"
+            f"Deactivated: {deactivated_count}\n"
+            f"Not Found: {not_found_count}\n"
+            f"Failed: {failed_count}",
+            reply_markup=admin_keyboard(is_admin=False)
+        )
+
+
+
+
+
+
 
 
 # Run the bot
