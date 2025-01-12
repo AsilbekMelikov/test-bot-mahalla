@@ -12,8 +12,9 @@ def admin_keyboard(is_admin):
     else:
         post_button = KeyboardButton(text="📨 Post jo'natish")
         admin_add_button = KeyboardButton(text="👤 Admin qo'shish")
+        see_groups_button = KeyboardButton(text="📋Barcha Guruhlar")
         # Add the buttons to the keyboard
-        keyboard = ReplyKeyboardMarkup(keyboard=[[admin_add_button, post_button]], resize_keyboard=True)
+        keyboard = ReplyKeyboardMarkup(keyboard=[[admin_add_button, post_button], [see_groups_button]], resize_keyboard=True)
 
     return keyboard
 

@@ -94,6 +94,16 @@ class Database:
         return self.execute(sql=sql, fetchall=True)
 
 
+
+    def get_all_groups(self):
+        
+        sql = """
+        SELECT * FROM groups_tb"""
+
+        return self.execute(sql=sql, fetchall=True)
+
+
+
     def register_admin(self, full_name, user_id):
         sql = """
         INSERT INTO admins (full_name, user_id)
