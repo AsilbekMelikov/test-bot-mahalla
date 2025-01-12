@@ -20,9 +20,9 @@ env.read_env()
 
 
 # BOT TOKEN and other settings
-BOT_TOKEN = env("BOT_TOKEN")
-# SUPER_ADMIN = 1002999262
-SUPER_ADMIN = 1104276600
+BOT_TOKEN = env("TOKEN")
+SUPER_ADMIN = 1002999262
+# SUPER_ADMIN = 1104276600
 
 
 # Initialize Bot and Dispatcher
@@ -222,7 +222,7 @@ async def confirm_and_send_post(message: Message, state: FSMContext):
     failed_groups = [] 
 
     # Har bir guruhga xabar yuborish
-    # Har bir guruhga xabar yuborish
+    # Har bir guruhgfrom aiogram.types.input_file import InputFilea xabar yuborish
     for index, group in enumerate(groups):
         group_id = group[0]
         try:
