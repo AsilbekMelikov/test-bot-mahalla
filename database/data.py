@@ -52,7 +52,7 @@ class Database:
 
         connection.close()
         return data
-    
+
     def create_admins_table(self):
         sql = """
         CREATE TABLE IF NOT EXISTS admins (
@@ -63,7 +63,6 @@ class Database:
         )
         """
         self.execute(sql=sql, commit=True)
-
 
     def create_table_groups(self):
         sql = """
@@ -76,33 +75,31 @@ class Database:
         """
         self.execute(sql=sql, commit=True)
 
-
     def register_groups(self, group_name, group_id):
         sql = """
         INSERT INTO groups_tb (group_name, group_id)
         VALUES (%s, %s)
         ON CONFLICT (group_id) DO NOTHING  -- Avoid duplicates
         """
-        params = (group_name, group_id)
+        params = (
+            group_name,
+            group_id,
+        )
         self.execute(sql=sql, params=params, commit=True)
 
     def get_groups(self):
-        
+
         sql = """
         SELECT group_id FROM groups_tb"""
 
         return self.execute(sql=sql, fetchall=True)
 
-
-
     def get_all_groups(self):
-        
+
         sql = """
         SELECT * FROM groups_tb"""
 
         return self.execute(sql=sql, fetchall=True)
-
-
 
     def register_admin(self, full_name, user_id):
         sql = """
@@ -122,9 +119,8 @@ class Database:
         params = (group_id,)
         self.execute(sql=sql, params=params, commit=True)
 
-
     def get_admin(self, user_id):
-        
+
         sql = """
         SELECT user_id FROM admins WHERE user_id = %s"""
 
@@ -132,9 +128,8 @@ class Database:
 
         return self.execute(sql=sql, params=params, fetchone=True)
 
-
     def get_admins(self):
-        
+
         sql = """
         SELECT * FROM admins"""
 
@@ -148,8 +143,6 @@ class Database:
 
         params = (user_id,)
         self.execute(sql=sql, params=params, commit=True)
-
-
 
 
 db = Database(

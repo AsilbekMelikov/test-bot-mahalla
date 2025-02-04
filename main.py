@@ -1,36 +1,41 @@
-import os
-import asyncio
-import pandas as pd
-from dotenv import load_dotenv
+import os, asyncio, logging, sys
 
-from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message, FSInputFile, ChatMemberUpdated, ReplyKeyboardRemove, CallbackQuery
-from aiogram.filters import Command
+import pandas as pd
+from aiogram import Bot, Dispatcher
+from aiogram.types import (
+    Message,
+    FSInputFile,
+    ChatMemberUpdated,
+    CallbackQuery,
+)
+from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from database.data import db
+import asyncio
 
 
-
-from keyboards.inline_keyboards import admin_keyboard, register_confirm_keyboard, send_confirm_keyboard
+from keyboards.inline_keyboards import (
+    admin_keyboard,
+    register_confirm_keyboard,
+    send_confirm_keyboard,
+)
+from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
 # BOT TOKEN and other settings
-BOT_TOKEN = os.getenv("TOKEN")
-SUPER_ADMIN = 1002999262
-# SUPER_ADMIN = 1104276600
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+# SUPER_ADMIN = 1002999262
+SUPER_ADMIN = 1104276600
 
-
-# Initialize Bot and Dispatcher
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 bot_messages = []
 
 
-# Define registration states
 class Registration(StatesGroup):
     waiting_for_full_name = State()
     waiting_for_user_id = State()
@@ -47,7 +52,7 @@ class AdminDeleteState(StatesGroup):
 
 
 # Start command handler
-@dp.message(Command("start"))
+@dp.message(CommandStart())
 async def start_command(message: Message):
     admin = db.get_admin(user_id=message.from_user.id)
 
@@ -76,9 +81,7 @@ async def start_command(message: Message):
         )
 
 
-@dp.callback_query(
-    lambda c: c.data in ["add_admin"]
-)
+@dp.callback_query(lambda c: c.data in ["add_admin"])
 async def add_admin(query: CallbackQuery, state: FSMContext):
     user_id = query.from_user.id
 
@@ -182,7 +185,7 @@ async def request_post_source(query: CallbackQuery, state: FSMContext):
 @dp.message(PostState.waiting_for_post_content)
 async def handle_post_content(message: Message, state: FSMContext):
     # Check if the message is forwarded or contains any media
-    if message.forward_from or message.forward_from_chat:
+    if message.forward_from or message.forward_from_chat or message.from_user:
         # For forwarded messages
         await state.update_data(post_content=message)  # Store the entire message object
         await message.reply(
@@ -206,17 +209,106 @@ async def handle_post_content(message: Message, state: FSMContext):
         )
 
 
-@dp.callback_query(PostState.waiting_for_confirmation, lambda c: c.data in ["confirm_post"])
+# @dp.callback_query(
+#     PostState.waiting_for_confirmation, lambda c: c.data in ["confirm_post"]
+# )
+# async def confirm_and_send_post(query: CallbackQuery, state: FSMContext):
+
+#     # Retrieve the stored message
+#     data = await state.get_data()
+#     post_content = data.get("post_content")
+#     admin = query.from_user.id
+#     get_admin = db.get_admin(user_id=admin)
+
+#     if not post_content:
+
+#         if get_admin:
+#             await query.message.reply(
+#                 "Xato: Post ma'lumotlari topilmadi.",
+#                 reply_markup=admin_keyboard(is_admin=True),
+#             )
+#         else:
+#             await query.message.reply(
+#                 "Xato: Post ma'lumotlari topilmadi.",
+#                 reply_markup=admin_keyboard(is_admin=False),
+#             )
+
+#         return
+
+#     groups = db.get_groups()
+
+#     # Send the message to all groups
+#     total_groups = len(groups)
+#     success_count = 0
+#     failed_count = 0
+#     blocked_count = 0
+#     deactivated_count = 0
+#     not_found_count = 0
+#     failed_groups = []
+
+#     for index, group in enumerate(groups):
+#         group_id = group[0]
+#         try:
+#             # Postni guruhga yuborish
+#             await bot.forward_message(
+#                 chat_id=group_id,
+#                 from_chat_id=post_content.chat.id,
+#                 message_id=post_content.message_id,
+#             )
+#             success_count += 1
+
+#         except Exception as e:
+#             print(e)
+
+#             # Xato turini aniqlash
+#             if "blocked" in str(e).lower():
+#                 blocked_count += 1
+#             elif "deactivated" in str(e).lower():
+#                 deactivated_count += 1
+#             elif "not found" in str(e).lower():
+#                 not_found_count += 1
+#             else:
+#                 failed_count += 1  # Boshqa xatolar
+
+#     # Statistika
+#     progress = (success_count / total_groups) * 100 if total_groups > 0 else 0
+
+#     if get_admin:
+#         await query.message.reply(
+#             f"Progress: {progress:.2f}% ({success_count + failed_count}/{total_groups} chats)\n"
+#             f"Success: {success_count}\n"
+#             f"Blocked: {blocked_count}\n"
+#             f"Deactivated: {deactivated_count}\n"
+#             f"Not Found: {not_found_count}\n"
+#             f"Failed: {failed_count}",
+#             reply_markup=admin_keyboard(is_admin=True),
+#         )
+#     else:
+
+#         await query.message.reply(
+#             f"Progress: {progress:.2f}% ({success_count + failed_count}/{total_groups} chats)\n"
+#             f"Success: {success_count}\n"
+#             f"Blocked: {blocked_count}\n"
+#             f"Deactivated: {deactivated_count}\n"
+#             f"Not Found: {not_found_count}\n"
+#             f"Failed: {failed_count}",
+#             reply_markup=admin_keyboard(is_admin=False),
+#         )
+
+#     await state.clear()
+
+
+@dp.callback_query(
+    PostState.waiting_for_confirmation, lambda c: c.data in ["confirm_post"]
+)
 async def confirm_and_send_post(query: CallbackQuery, state: FSMContext):
 
-    # Retrieve the stored message
     data = await state.get_data()
     post_content = data.get("post_content")
     admin = query.from_user.id
     get_admin = db.get_admin(user_id=admin)
 
     if not post_content:
-
         if get_admin:
             await query.message.reply(
                 "Xato: Post ma'lumotlari topilmadi.",
@@ -227,68 +319,120 @@ async def confirm_and_send_post(query: CallbackQuery, state: FSMContext):
                 "Xato: Post ma'lumotlari topilmadi.",
                 reply_markup=admin_keyboard(is_admin=False),
             )
-
         return
 
     groups = db.get_groups()
-
-    # Send the message to all groups
     total_groups = len(groups)
-    success_count = 0
-    failed_count = 0
-    blocked_count = 0  # Yuborishda bloklangan guruhlar
-    deactivated_count = 0  # O'chirilgan guruhlar
-    not_found_count = 0  # Topilmagan guruhlar
+
+    batch_size = 100
+    batches = [groups[i : i + batch_size] for i in range(0, total_groups, batch_size)]
+
+    total_success = 0
+    total_failed = 0
+    total_blocked = 0
+    total_deactivated = 0
+    total_not_found = 0
+    total_not_forwarded = 0
+    total_not_permitted = 0
     failed_groups = []
 
-    # Har bir guruhga xabar yuborish
-    # Har bir guruhgfrom aiogram.types.input_file import InputFilea xabar yuborish
-    for index, group in enumerate(groups):
+    for batch_index, batch in enumerate(batches):
+
+        (
+            success,
+            failed,
+            blocked,
+            deactivated,
+            not_found,
+            not_forwarded,
+            not_permitted,
+            failed_batch,
+        ) = await send_batch(query.bot, post_content, batch)
+
+        total_success += success
+        total_failed += failed
+        total_blocked += blocked
+        total_deactivated += deactivated
+        total_not_found += not_found
+        total_not_forwarded += not_forwarded
+        total_not_permitted += not_permitted
+        failed_groups.extend(failed_batch)
+        await asyncio.sleep(5)
+
+    progress = (total_success / total_groups) * 100 if total_groups > 0 else 0
+    final_report = (
+        f"Final Report:{progress:.2f}% ({total_success + total_failed}/{total_groups} chats)\n"
+        f"Total Groups: {total_groups}\n"
+        f"Success: {total_success}\n"
+        f"Blocked: {total_blocked}\n"
+        f"Deactivated: {total_deactivated}\n"
+        f"Not Found: {total_not_found}\n"
+        f"Failed: {total_failed}\n"
+        f"Total Not Sent: {total_not_forwarded}\n"
+        f"Total Not Permitted: {total_not_permitted}\n"
+        f"Failed Groups: {failed_groups if failed_groups else 'None'}"
+    )
+
+    if get_admin:
+        await query.message.reply(
+            final_report, reply_markup=admin_keyboard(is_admin=True)
+        )
+    else:
+        await query.message.reply(
+            final_report, reply_markup=admin_keyboard(is_admin=False)
+        )
+
+    # Clear the state
+    await state.clear()
+
+
+async def send_batch(bot: Bot, post_content, batch):
+
+    success = 0
+    failed = 0
+    blocked = 0
+    deactivated = 0
+    not_found = 0
+    not_forwarded = 0
+    not_permitted = 0
+    failed_batch = []
+
+    for group in batch:
         group_id = group[0]
         try:
-            # Postni guruhga yuborish
+            # Forward the message to the group
             await bot.forward_message(
                 chat_id=group_id,
                 from_chat_id=post_content.chat.id,
                 message_id=post_content.message_id,
             )
-            success_count += 1  # Yuborilgan guruhlar sonini oshirish
+            success += 1
         except Exception as e:
-            # Xato turini aniqlash
+            print(f"Error sending to group {group_id}: {e}")
             if "blocked" in str(e).lower():
-                blocked_count += 1
+                blocked += 1
             elif "deactivated" in str(e).lower():
-                deactivated_count += 1
+                deactivated += 1
             elif "not found" in str(e).lower():
-                not_found_count += 1
+                not_found += 1
+            elif "can't be forwarded" in str(e).lower():
+                not_forwarded += 1
+            elif "administrator rights" in str(e).lower():
+                not_permitted += 1
             else:
-                failed_count += 1  # Boshqa xatolar
+                failed += 1
+            failed_batch.append(group_id)
 
-
-    # Statistika
-    progress = (success_count / total_groups) * 100 if total_groups > 0 else 0
-
-    if get_admin:
-        await query.message.reply(
-            f"Progress: {progress:.2f}% ({success_count + failed_count}/{total_groups} chats)\n"
-            f"Success: {success_count}\n"
-            f"Blocked: {blocked_count}\n"
-            f"Deactivated: {deactivated_count}\n"
-            f"Not Found: {not_found_count}\n"
-            f"Failed: {failed_count}",
-            reply_markup=admin_keyboard(is_admin=True),
-        )
-    else:
-
-        await query.message.reply(
-            f"Progress: {progress:.2f}% ({success_count + failed_count}/{total_groups} chats)\n"
-            f"Success: {success_count}\n"
-            f"Blocked: {blocked_count}\n"
-            f"Deactivated: {deactivated_count}\n"
-            f"Not Found: {not_found_count}\n"
-            f"Failed: {failed_count}",
-            reply_markup=admin_keyboard(is_admin=False),
-        )
+    return (
+        success,
+        failed,
+        blocked,
+        deactivated,
+        not_found,
+        not_forwarded,
+        not_permitted,
+        failed_batch,
+    )
 
 
 @dp.callback_query(lambda c: c.data in ["cancel_post"])
@@ -362,22 +506,27 @@ async def handle_delete_admin_user_id(message: Message, state: FSMContext):
     await state.clear()
 
 
-
 @dp.my_chat_member()
 async def track_joined_groups(event: ChatMemberUpdated):
     """Track groups the bot joins or leaves."""
     chat = event.chat
+    # group_id = str(chat.id)
 
-    if event.new_chat_member.status in ["member", "administrator"]:
+    if event.new_chat_member.status in [
+        "administrator",
+    ] and chat.type in [
+        "channel",
+        "supergroup",
+        "group",
+    ]:
+
         # Bot added to a group
         db.register_groups(group_name=chat.title, group_id=chat.id)
 
+    elif event.new_chat_member.status in ["left", "restricted", "kicked"]:
 
-
-    elif event.new_chat_member.status == "left":
         # Bot removed from a group
         db.delete_group(group_id=chat.id)
-
 
 
 @dp.callback_query(lambda c: c.data in ["all_groups"])
@@ -398,11 +547,9 @@ async def cancel_post(query: CallbackQuery, state: FSMContext):
 
 # Run the bot
 async def main():
-    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
     asyncio.run(main())
-
-
