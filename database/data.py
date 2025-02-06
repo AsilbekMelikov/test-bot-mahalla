@@ -148,7 +148,7 @@ class Database:
 db = Database(
     db_name="mahallanewsbot",
     db_user="postgres",
-    db_password="0000",
+    db_password="1111Asil@",
     db_host="localhost",
     db_port=5432,
 )

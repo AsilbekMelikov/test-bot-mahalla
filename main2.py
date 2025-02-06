@@ -29,7 +29,8 @@ load_dotenv()
 
 # BOT TOKEN and other settings
 BOT_TOKEN = os.getenv("TOKEN")
-SUPER_ADMIN = 1002999262
+# SUPER_ADMIN = 1002999262
+SUPER_ADMIN = 5014032073
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -321,9 +322,6 @@ async def confirm_and_send_post(query: CallbackQuery, state: FSMContext):
                 reply_markup=admin_keyboard(is_admin=False),
             )
         return
-    await query.answer("")
-
-    await bot.send_message(text="✅ Post jo'natishni tasdiqladingiz, Tashakkur", chat_id=admin)
 
     groups = db.get_groups()
     total_groups = len(groups)
