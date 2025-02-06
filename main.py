@@ -29,7 +29,8 @@ load_dotenv()
 
 # BOT TOKEN and other settings
 BOT_TOKEN = os.getenv("TOKEN")
-SUPER_ADMIN = 1002999262
+
+SUPER_ADMIN = os.getenv("MY_ID")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
